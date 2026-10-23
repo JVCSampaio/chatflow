@@ -1,0 +1,1201 @@
+{
+  "info": {
+    "name": "ChatFlow API",
+    "description": "Testes de API do ChatFlow: saúde, webchat, webhook do WhatsApp (assinatura HMAC e idempotência), atendimento humano e erros. Rode com o Newman: npm run test:postman.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "contratoWebchat",
+      "value": "{\"type\":\"object\",\"required\":[\"duplicada\",\"conversa\",\"mensagens\"],\"additionalProperties\":false,\"properties\":{\"duplicada\":{\"type\":\"boolean\"},\"conversa\":{\"type\":\"object\",\"required\":[\"id\",\"canal\",\"contato\",\"status\",\"atendente\",\"transferencia\",\"criadaEm\",\"atualizadaEm\",\"encerradaEm\"],\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{24}$\"},\"canal\":{\"enum\":[\"whatsapp\",\"telegram\",\"webchat\"]},\"contato\":{\"type\":\"object\",\"required\":[\"id\",\"nome\"]},\"status\":{\"enum\":[\"bot\",\"aguardando\",\"em_atendimento\",\"encerrada\"]},\"atendente\":{\"type\":[\"string\",\"null\"]},\"transferencia\":{\"type\":[\"object\",\"null\"]},\"criadaEm\":{\"type\":\"string\"},\"atualizadaEm\":{\"type\":\"string\"},\"encerradaEm\":{\"type\":[\"string\",\"null\"]}}},\"mensagens\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"id\",\"conversaId\",\"autor\",\"atendente\",\"texto\",\"criadaEm\"],\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{24}$\"},\"conversaId\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{24}$\"},\"autor\":{\"enum\":[\"cliente\",\"bot\",\"atendente\"]},\"atendente\":{\"type\":[\"string\",\"null\"]},\"texto\":{\"type\":\"string\"},\"criadaEm\":{\"type\":\"string\"}}}}}}"
+    },
+    {
+      "key": "contratoConversa",
+      "value": "{\"type\":\"object\",\"required\":[\"id\",\"canal\",\"contato\",\"status\",\"atendente\",\"transferencia\",\"criadaEm\",\"atualizadaEm\",\"encerradaEm\"],\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{24}$\"},\"canal\":{\"enum\":[\"whatsapp\",\"telegram\",\"webchat\"]},\"contato\":{\"type\":\"object\",\"required\":[\"id\",\"nome\"]},\"status\":{\"enum\":[\"bot\",\"aguardando\",\"em_atendimento\",\"encerrada\"]},\"atendente\":{\"type\":[\"string\",\"null\"]},\"transferencia\":{\"type\":[\"object\",\"null\"]},\"criadaEm\":{\"type\":\"string\"},\"atualizadaEm\":{\"type\":\"string\"},\"encerradaEm\":{\"type\":[\"string\",\"null\"]}}}"
+    },
+    {
+      "key": "contratoErro",
+      "value": "{\"type\":\"object\",\"required\":[\"erro\"],\"properties\":{\"erro\":{\"type\":\"string\",\"minLength\":1},\"detalhes\":{\"type\":\"array\"}}}"
+    }
+  ],
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Vale para todas as requisições: todo pedido recebe um id de correlação.",
+          "pm.test('responde com X-Request-Id', () => pm.response.to.have.header('X-Request-Id'))"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Saúde e observabilidade",
+      "description": "Disponibilidade do serviço e métricas no formato do Prometheus.",
+      "item": [
+        {
+          "name": "Health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200))",
+                  "pm.test('serviço e banco disponíveis', () => pm.expect(pm.response.json()).to.eql({ status: 'ok', banco: 'ok' }))",
+                  "pm.test('responde em menos de 500 ms', () => pm.expect(pm.response.responseTime).to.be.below(500))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Métricas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200 em texto do Prometheus', () => {",
+                  "  pm.response.to.have.status(200)",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('text/plain')",
+                  "})",
+                  "pm.test('expõe os contadores do atendimento', () => {",
+                  "  const texto = pm.response.text()",
+                  "  for (const nome of ['mensagens_recebidas_total', 'mensagens_duplicadas_total', 'transferencias_total', 'http_duracao_segundos']) {",
+                  "    pm.expect(texto).to.include('# TYPE chatflow_' + nome)",
+                  "  }",
+                  "})"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metrics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "metrics"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Webchat: segunda via",
+      "description": "Fluxo completo do bot pelo widget do site, do cumprimento ao encerramento.",
+      "item": [
+        {
+          "name": "Cumprimento e menu",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('sessao', pm.variables.replaceIn('{{$guid}}'))"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200))",
+                  "pm.test('corpo segue o contrato', () => pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get('contratoWebchat'))))",
+                  "const textosDoBot = pm.response.json().mensagens.filter((m) => m.autor === 'bot').map((m) => m.texto)",
+                  "pm.test('bot cumprimenta e mostra o menu', () => {",
+                  "  pm.expect(textosDoBot[0]).to.eql('Olá! Sou o assistente virtual do atendimento.')",
+                  "  pm.expect(textosDoBot[1]).to.include('1 - Segunda via da fatura')",
+                  "})",
+                  "pm.collectionVariables.set('conversaWebchat', pm.response.json().conversa.id)"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessao\": \"{{sessao}}\",\n  \"texto\": \"oi\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webchat/mensagens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "webchat",
+                "mensagens"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Opção 1: segunda via",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200))",
+                  "const textosDoBot = pm.response.json().mensagens.filter((m) => m.autor === 'bot').map((m) => m.texto)",
+                  "pm.test('bot pede o CPF', () => pm.expect(textosDoBot).to.eql(['Para enviar a segunda via, informe o CPF do titular.']))",
+                  "pm.test('continua na mesma conversa', () => pm.expect(pm.response.json().conversa.id).to.eql(pm.collectionVariables.get('conversaWebchat')))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessao\": \"{{sessao}}\",\n  \"texto\": \"1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webchat/mensagens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "webchat",
+                "mensagens"
+              ]
+            }
+          }
+        },
+        {
+          "name": "CPF com fatura em aberto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200))",
+                  "const textosDoBot = pm.response.json().mensagens.filter((m) => m.autor === 'bot').map((m) => m.texto)",
+                  "pm.test('envia a segunda via com o e-mail mascarado', () => {",
+                  "  pm.expect(textosDoBot[0]).to.include('R$ 99,90')",
+                  "  pm.expect(textosDoBot[0]).to.include('a***@example.com')",
+                  "})",
+                  "pm.test('o CPF volta mascarado (LGPD)', () => {",
+                  "  const doCliente = pm.response.json().mensagens.find((m) => m.autor === 'cliente')",
+                  "  pm.expect(doCliente.texto).to.eql('***.456.789-**')",
+                  "})"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessao\": \"{{sessao}}\",\n  \"texto\": \"123.456.789-09\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webchat/mensagens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "webchat",
+                "mensagens"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Sair encerra a conversa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200))",
+                  "pm.test('conversa encerrada', () => pm.expect(pm.response.json().conversa.status).to.eql('encerrada'))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessao\": \"{{sessao}}\",\n  \"texto\": \"sair\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webchat/mensagens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "webchat",
+                "mensagens"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Texto vazio é recusado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400))",
+                  "pm.test('erro segue o contrato', () => pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get('contratoErro'))))",
+                  "pm.test('indica o campo texto', () => {",
+                  "  const corpo = pm.response.json()",
+                  "  pm.expect(corpo.erro).to.eql('Dados inválidos.')",
+                  "  pm.expect(corpo.detalhes.map((d) => d.campo)).to.include('texto')",
+                  "})"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessao\": \"{{sessao}}\",\n  \"texto\": \"   \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webchat/mensagens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "webchat",
+                "mensagens"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. WhatsApp: webhook da Cloud API",
+      "description": "Verificação do webhook, assinatura X-Hub-Signature-256 e idempotência por wamid.",
+      "item": [
+        {
+          "name": "Verificação com token correto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200))",
+                  "pm.test('devolve o desafio', () => pm.expect(pm.response.text()).to.eql('1158201444'))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token={{whatsappVerifyToken}}&hub.challenge=1158201444",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "whatsapp"
+              ],
+              "query": [
+                {
+                  "key": "hub.mode",
+                  "value": "subscribe"
+                },
+                {
+                  "key": "hub.verify_token",
+                  "value": "{{whatsappVerifyToken}}"
+                },
+                {
+                  "key": "hub.challenge",
+                  "value": "1158201444"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verificação com token errado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=token-errado&hub.challenge=1158201444",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "whatsapp"
+              ],
+              "query": [
+                {
+                  "key": "hub.mode",
+                  "value": "subscribe"
+                },
+                {
+                  "key": "hub.verify_token",
+                  "value": "token-errado"
+                },
+                {
+                  "key": "hub.challenge",
+                  "value": "1158201444"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Assinatura inválida é recusada",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('telefone', '5532' + _.random(900000000, 999999999))",
+                  "pm.collectionVariables.set('wamid', 'wamid.' + pm.variables.replaceIn('{{$guid}}'))"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401))",
+                  "pm.test('mensagem de erro', () => pm.expect(pm.response.json().erro).to.eql('Assinatura inválida.'))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Hub-Signature-256",
+                "value": "sha256=0000000000000000000000000000000000000000000000000000000000000000"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [{\n    \"id\": \"102290129340398\",\n    \"changes\": [{\n      \"field\": \"messages\",\n      \"value\": {\n        \"messaging_product\": \"whatsapp\",\n        \"contacts\": [{ \"profile\": { \"name\": \"Ana Souza\" }, \"wa_id\": \"{{telefone}}\" }],\n        \"messages\": [{ \"from\": \"{{telefone}}\", \"id\": \"{{wamid}}\", \"timestamp\": \"1792760400\", \"type\": \"text\", \"text\": { \"body\": \"oi\" } }]\n      }\n    }]\n  }]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/whatsapp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "whatsapp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mensagem assinada é processada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200))",
+                  "pm.test('uma mensagem recebida', () => pm.expect(pm.response.json()).to.eql({ recebidas: 1, duplicadas: 0 }))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [{\n    \"id\": \"102290129340398\",\n    \"changes\": [{\n      \"field\": \"messages\",\n      \"value\": {\n        \"messaging_product\": \"whatsapp\",\n        \"contacts\": [{ \"profile\": { \"name\": \"Ana Souza\" }, \"wa_id\": \"{{telefone}}\" }],\n        \"messages\": [{ \"from\": \"{{telefone}}\", \"id\": \"{{wamid}}\", \"timestamp\": \"1792760400\", \"type\": \"text\", \"text\": { \"body\": \"oi\" } }]\n      }\n    }]\n  }]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/whatsapp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "whatsapp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mensagem assinada reenviada é ignorada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200 (a Meta não deve reenviar de novo)', () => pm.response.to.have.status(200))",
+                  "pm.test('reconhecida como duplicada', () => pm.expect(pm.response.json()).to.eql({ recebidas: 0, duplicadas: 1 }))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [{\n    \"id\": \"102290129340398\",\n    \"changes\": [{\n      \"field\": \"messages\",\n      \"value\": {\n        \"messaging_product\": \"whatsapp\",\n        \"contacts\": [{ \"profile\": { \"name\": \"Ana Souza\" }, \"wa_id\": \"{{telefone}}\" }],\n        \"messages\": [{ \"from\": \"{{telefone}}\", \"id\": \"{{wamid}}\", \"timestamp\": \"1792760400\", \"type\": \"text\", \"text\": { \"body\": \"oi\" } }]\n      }\n    }]\n  }]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/whatsapp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "whatsapp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Conversa do contato",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200))",
+                  "const itens = pm.response.json().itens",
+                  "pm.test('uma única conversa, com o bot', () => {",
+                  "  pm.expect(itens).to.have.length(1)",
+                  "  pm.expect(itens[0].status).to.eql('bot')",
+                  "  pm.expect(itens[0].contato.nome).to.eql('Ana Souza')",
+                  "})",
+                  "pm.test('conversa segue o contrato', () => pm.expect(itens[0]).to.have.jsonSchema(JSON.parse(pm.collectionVariables.get('contratoConversa'))))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/conversas?canal=whatsapp&contato={{telefone}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "conversas"
+              ],
+              "query": [
+                {
+                  "key": "canal",
+                  "value": "whatsapp"
+                },
+                {
+                  "key": "contato",
+                  "value": "{{telefone}}"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Assina com HMAC-SHA256 as requisições \"Mensagem assinada...\", como faz a Meta.",
+              "if (pm.info.requestName.startsWith('Mensagem assinada')) {",
+              "  const corpo = pm.variables.replaceIn(pm.request.body.raw)",
+              "  const assinatura = CryptoJS.HmacSHA256(corpo, pm.environment.get('whatsappAppSecret')).toString(CryptoJS.enc.Hex)",
+              "  pm.request.headers.upsert({ key: 'X-Hub-Signature-256', value: 'sha256=' + assinatura })",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Atendimento humano",
+      "description": "Transferência para a fila, disputa entre atendentes, respostas e encerramento.",
+      "item": [
+        {
+          "name": "Cliente pede atendente",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('sessaoFila', pm.variables.replaceIn('{{$guid}}'))"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200))",
+                  "const conversa = pm.response.json().conversa",
+                  "pm.test('conversa vai para a fila com o motivo', () => {",
+                  "  pm.expect(conversa.status).to.eql('aguardando')",
+                  "  pm.expect(conversa.transferencia.motivo).to.eql('pedido_do_cliente')",
+                  "})",
+                  "pm.collectionVariables.set('conversaFila', conversa.id)"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessao\": \"{{sessaoFila}}\",\n  \"texto\": \"atendente\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webchat/mensagens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "webchat",
+                "mensagens"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Fila de espera",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200))",
+                  "const itens = pm.response.json().itens",
+                  "pm.test('a conversa está na fila', () => pm.expect(itens.map((c) => c.id)).to.include(pm.collectionVariables.get('conversaFila')))",
+                  "pm.test('fila ordenada pela espera mais antiga', () => {",
+                  "  const momentos = itens.map((c) => Date.parse(c.transferencia.em))",
+                  "  pm.expect(momentos).to.eql([...momentos].sort((a, b) => a - b))",
+                  "})"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/conversas?status=aguardando",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "conversas"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "aguardando"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Marina assume",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200))",
+                  "pm.test('em atendimento com Marina', () => pm.expect(pm.response.json()).to.include({ status: 'em_atendimento', atendente: 'Marina' }))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"atendente\": \"Marina\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/conversas/{{conversaFila}}/assumir",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "conversas",
+                "{{conversaFila}}",
+                "assumir"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Paulo tenta assumir a mesma conversa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409))",
+                  "pm.test('informa quem está com a conversa', () => pm.expect(pm.response.json().erro).to.eql('Esta conversa já está com Marina.'))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"atendente\": \"Paulo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/conversas/{{conversaFila}}/assumir",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "conversas",
+                "{{conversaFila}}",
+                "assumir"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Marina responde",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201))",
+                  "pm.test('mensagem registrada como da atendente', () => pm.expect(pm.response.json()).to.include({ autor: 'atendente', atendente: 'Marina' }))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"atendente\": \"Marina\",\n  \"texto\": \"Olá, aqui é a Marina! Como posso ajudar?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/conversas/{{conversaFila}}/mensagens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "conversas",
+                "{{conversaFila}}",
+                "mensagens"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Paulo não pode responder",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"atendente\": \"Paulo\",\n  \"texto\": \"Oi!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/conversas/{{conversaFila}}/mensagens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "conversas",
+                "{{conversaFila}}",
+                "mensagens"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cliente recebe a resposta no webchat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200))",
+                  "const corpo = pm.response.json()",
+                  "pm.test('situação: em atendimento com Marina', () => pm.expect(corpo.conversa).to.include({ status: 'em_atendimento', atendente: 'Marina' }))",
+                  "pm.test('última mensagem é da atendente', () => pm.expect(corpo.mensagens.at(-1)).to.include({ autor: 'atendente', texto: 'Olá, aqui é a Marina! Como posso ajudar?' }))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/webchat/{{sessaoFila}}/mensagens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "webchat",
+                "{{sessaoFila}}",
+                "mensagens"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Marina encerra",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200))",
+                  "pm.test('conversa encerrada com data', () => {",
+                  "  pm.expect(pm.response.json().status).to.eql('encerrada')",
+                  "  pm.expect(pm.response.json().encerradaEm).to.be.a('string')",
+                  "})"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"atendente\": \"Marina\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/conversas/{{conversaFila}}/encerrar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "conversas",
+                "{{conversaFila}}",
+                "encerrar"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Erros",
+      "description": "Respostas de erro padronizadas: { erro, detalhes? }.",
+      "item": [
+        {
+          "name": "Id de conversa inválido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400))",
+                  "pm.test('erro segue o contrato', () => pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get('contratoErro'))))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/conversas/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "conversas",
+                "abc"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Conversa inexistente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404))",
+                  "pm.test('mensagem de erro', () => pm.expect(pm.response.json()).to.eql({ erro: 'Conversa não encontrada.' }))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/conversas/64b7f0f0f0f0f0f0f0f0f0f0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "conversas",
+                "64b7f0f0f0f0f0f0f0f0f0f0"
+              ]
+            }
+          }
+        },
+        {
+          "name": "JSON malformado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400))",
+                  "pm.test('mensagem de erro', () => pm.expect(pm.response.json()).to.eql({ erro: 'JSON inválido.' }))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sessao\": ",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webchat/mensagens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "webchat",
+                "mensagens"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Telegram sem token secreto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": 1,\n  \"message\": {\n    \"message_id\": 1,\n    \"chat\": {\n      \"id\": 1\n    },\n    \"date\": 1792760400,\n    \"text\": \"oi\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/telegram",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "telegram"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Rota inexistente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/nao-existe",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "nao-existe"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+node_modules
+web/dist
+reports
+.git
+docs
+e2e
+features
+tests
+postman

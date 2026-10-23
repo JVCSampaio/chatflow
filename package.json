@@ -1,0 +1,63 @@
+{
+  "name": "chatflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chatbot de atendimento omnichannel (WhatsApp, Telegram e webchat) com transferência para atendente e testes em camadas.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/server.ts",
+    "dev": "node --watch src/server.ts",
+    "build:web": "vite build web",
+    "dev:web": "vite web",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:api": "vitest run tests/api",
+    "test:coverage": "vitest run --coverage",
+    "test:bdd": "cucumber-js",
+    "test:postman": "newman run postman/chatflow.postman_collection.json -e postman/local.postman_environment.json -r cli,htmlextra --reporter-htmlextra-export reports/newman.html",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "start:teste": "node src/server.ts --teste",
+    "e2e": "npm run build:web && start-server-and-test start:teste http-get://127.0.0.1:3000/health \"npm run test:postman && npm run test:e2e\"",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web",
+    "lint": "prettier --check . && npm run typecheck",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@prometheus-io/client": "0.16.1",
+    "express": "5.3.0",
+    "mongodb": "7.7.0",
+    "pino": "10.4.0",
+    "pino-http": "11.0.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@cucumber/cucumber": "13.3.0",
+    "@types/express": "5.0.6",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/selenium-webdriver": "4.35.7",
+    "@types/supertest": "7.2.1",
+    "@vitejs/plugin-react": "6.1.2",
+    "@vitest/coverage-v8": "5.0.5",
+    "mongodb-memory-server": "11.3.0",
+    "newman": "6.2.3",
+    "newman-reporter-htmlextra": "1.23.1",
+    "prettier": "3.9.10",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "selenium-webdriver": "4.51.0",
+    "start-server-and-test": "3.0.13",
+    "supertest": "7.3.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  },
+  "allowScripts": {
+    "mongodb-memory-server@11.3.0": false
+  }
+}

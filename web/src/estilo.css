@@ -1,0 +1,312 @@
+:root {
+  --fundo: #f4f6fb;
+  --painel: #ffffff;
+  --texto: #1d2433;
+  --suave: #5f6b85;
+  --borda: #e1e6f0;
+  --primaria: #4f46e5;
+  --primaria-escura: #3730a3;
+  --cliente: #e0e7ff;
+  --atendente: #dcfce7;
+  --erro: #b42318;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  color: var(--texto);
+  background: var(--fundo);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+button {
+  font: inherit;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  background: var(--primaria);
+  color: #fff;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--primaria-escura);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.secundario {
+  background: transparent;
+  color: var(--primaria);
+  border: 1px solid var(--borda);
+}
+
+input {
+  font: inherit;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  min-width: 0;
+}
+
+input:focus,
+button:focus-visible {
+  outline: 2px solid var(--primaria);
+  outline-offset: 2px;
+}
+
+.cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.2rem;
+  background: var(--painel);
+  border-bottom: 1px solid var(--borda);
+}
+
+.cabecalho div {
+  display: flex;
+  flex-direction: column;
+}
+
+.cabecalho small {
+  color: var(--suave);
+}
+
+.situacao {
+  font-size: 0.85rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: var(--cliente);
+  color: var(--primaria-escura);
+}
+
+.situacao.aguardando {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.situacao.em_atendimento {
+  background: var(--atendente);
+  color: #166534;
+}
+
+.situacao.encerrada {
+  background: var(--borda);
+  color: var(--suave);
+}
+
+.mensagens {
+  list-style: none;
+  margin: 0;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  overflow-y: auto;
+}
+
+.mensagem {
+  max-width: min(80%, 34rem);
+  padding: 0.6rem 0.9rem;
+  border-radius: 12px;
+  background: var(--painel);
+  border: 1px solid var(--borda);
+}
+
+.mensagem p {
+  margin: 0;
+  white-space: pre-line;
+}
+
+.mensagem.cliente {
+  align-self: flex-end;
+  background: var(--cliente);
+  border-color: transparent;
+}
+
+.mensagem.atendente {
+  background: var(--atendente);
+  border-color: transparent;
+}
+
+.autor {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--suave);
+  margin-bottom: 0.2rem;
+}
+
+.vazio {
+  color: var(--suave);
+  text-align: center;
+  padding: 1rem;
+}
+
+.envio {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.8rem 1rem;
+  background: var(--painel);
+  border-top: 1px solid var(--borda);
+}
+
+.envio input {
+  flex: 1;
+}
+
+.erro {
+  margin: 0;
+  padding: 0.6rem 1rem;
+  color: var(--erro);
+  background: #fef3f2;
+}
+
+/* ---------- Webchat ---------- */
+
+.pagina-chat {
+  max-width: 44rem;
+  height: 100dvh;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--fundo);
+  border-inline: 1px solid var(--borda);
+}
+
+.pagina-chat .mensagens {
+  flex: 1;
+}
+
+/* ---------- Console do atendente ---------- */
+
+.console {
+  min-height: 100dvh;
+}
+
+.nome {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--suave);
+}
+
+.aviso {
+  margin: 1rem 1.2rem 0;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  background: var(--cliente);
+}
+
+.colunas {
+  display: grid;
+  grid-template-columns: minmax(16rem, 22rem) 1fr;
+  align-items: start;
+  gap: 1rem;
+  padding: 1rem 1.2rem;
+}
+
+.painel {
+  background: var(--painel);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.painel h2 {
+  font-size: 1rem;
+  margin: 0 0 0.8rem;
+}
+
+.cartoes {
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.cartao {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.8rem;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+}
+
+.cartao.selecionado {
+  border-color: var(--primaria);
+}
+
+.cartao small {
+  color: var(--suave);
+  font-weight: normal;
+}
+
+.canal {
+  justify-self: start;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--borda);
+}
+
+.canal.whatsapp {
+  background: #dcfce7;
+}
+
+.canal.telegram {
+  background: #e0f2fe;
+}
+
+.conversa {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 7.5rem);
+  min-height: 24rem;
+}
+
+.conversa .mensagens {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+}
+
+.conversa .envio {
+  padding: 0.8rem 0 0;
+  border-top: 0;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .colunas {
+    grid-template-columns: 1fr;
+  }
+
+  .cabecalho {
+    flex-wrap: wrap;
+  }
+}

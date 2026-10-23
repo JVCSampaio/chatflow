@@ -1,0 +1,6 @@
+node_modules/
+web/dist/
+reports/
+docs/*.png
+package-lock.json
+postman/

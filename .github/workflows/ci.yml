@@ -1,0 +1,159 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    name: Unidade, API e BDD
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mongo:
+        image: mongo:8
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      MONGO_URL: mongodb://127.0.0.1:27017
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Formatação e tipos
+        run: npm run lint
+      - name: Unidade e API (Vitest + Supertest), com cobertura mínima
+        run: npm run test:coverage
+      - name: Aceitação em Gherkin (Cucumber)
+        run: npm run test:bdd
+      - name: Resumo da cobertura
+        if: always()
+        run: |
+          node -e "
+            const t = require('./reports/cobertura/coverage-summary.json').total
+            const linha = (nome, m) => '| ' + nome + ' | ' + m.pct + '% | ' + m.covered + '/' + m.total + ' |'
+            console.log(['### Cobertura', '| Métrica | % | Cobertos |', '|---|---|---|',
+              linha('Linhas', t.lines), linha('Ramos', t.branches), linha('Funções', t.functions)].join('\n'))
+          " >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: relatorios-testes
+          path: reports/
+
+  ponta-a-ponta:
+    name: Postman (Newman) e Selenium
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mongo:
+        image: mongo:8
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      MONGO_URL: mongodb://127.0.0.1:27017
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Interface, servidor de teste, Newman e Selenium (Chrome)
+        run: npm run e2e
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: relatorios-ponta-a-ponta
+          path: reports/
+
+  container:
+    name: Container (Docker Compose)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Construir e subir app + MongoDB
+        run: docker compose up -d --build --wait
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Coleção Postman contra o container
+        run: >-
+          npx newman run postman/chatflow.postman_collection.json -e postman/local.postman_environment.json
+          --env-var whatsappAppSecret=segredo-local-do-compose --env-var whatsappVerifyToken=token-local-do-compose
+      - name: Logs do container
+        if: failure()
+        run: docker compose logs
+
+  publicar:
+    name: Publicar relatórios
+    needs: [testes, ponta-a-ponta]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artefatos
+      - name: Montar a página de relatórios
+        run: |
+          mkdir -p _site
+          cp -r artefatos/relatorios-testes/cobertura _site/cobertura
+          cp artefatos/relatorios-testes/bdd.html _site/bdd.html
+          cp artefatos/relatorios-ponta-a-ponta/newman.html _site/newman.html
+          cat > _site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="pt-BR">
+            <head>
+              <meta charset="utf-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1" />
+              <title>ChatFlow · Relatórios de testes</title>
+              <style>
+                body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 3rem auto; padding: 0 1rem; color: #1d2433; }
+                a { color: #4f46e5; } li { margin: 0.6rem 0; } small { color: #5f6b85; }
+              </style>
+            </head>
+            <body>
+              <h1>ChatFlow · Relatórios de testes</h1>
+              <p>Gerados pela última execução do CI na branch main.</p>
+              <ul>
+                <li><a href="bdd.html">Cenários BDD (Cucumber)</a> <small>regras de negócio em Gherkin</small></li>
+                <li><a href="newman.html">API com Postman/Newman</a> <small>requisições e asserções</small></li>
+                <li><a href="cobertura/index.html">Cobertura de código</a> <small>testes de unidade e de API</small></li>
+              </ul>
+              <p><a href="https://github.com/JVCSampaio/chatflow">Código no GitHub</a></p>
+            </body>
+          </html>
+          HTML
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v5

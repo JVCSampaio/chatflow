@@ -1,0 +1,26 @@
+services:
+  app:
+    build: .
+    ports: ['127.0.0.1:3000:3000']
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      # Valores de exemplo para rodar localmente; em produção, use segredos reais.
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-segredo-local-do-compose}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-token-local-do-compose}
+      TELEGRAM_SECRET_TOKEN: ${TELEGRAM_SECRET_TOKEN:-telegram-local-do-compose}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:8
+    volumes: ['dados:/data/db']
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  dados:
