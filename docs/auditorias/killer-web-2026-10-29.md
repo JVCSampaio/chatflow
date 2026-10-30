@@ -26,17 +26,17 @@ Método: skill `visant-killer` (github.com/pedrojaques99/visant-skills-public) c
 
 ## Portão
 
-| Detector                             | Antes                                               | Depois                                                        |
-| ------------------------------------ | --------------------------------------------------- | ------------------------------------------------------------- |
-| impeccable (24 estados renderizados) | 20 problemas e 4 avisos                             | 0 e 0                                                         |
-| botão secundário no hover            | texto índigo sobre índigo escuro, 1,6:1 (ilegível)  | fundo neutro, texto da marca a 7:1                            |
-| texto cinza na bolha do cliente      | 4,3:1                                               | 5,7:1                                                         |
-| copy-lint                            | 3 (separador `·` nos metadados)                     | 0                                                             |
-| noise-scan                           | 2 (um "Abrir" repetido em cada conversa)            | 0                                                             |
-| cores                                | 17 cores cruas (16 distintas) da paleta do Tailwind | tokens HSL, tema claro e escuro                               |
-| corta-scan e ritmo-scan (390 e 1280) | não medido                                          | 0                                                             |
-| `npm test`, BDD, Postman             | 166, 24 cenários, 26 requisições e 82 asserções     | iguais, passam                                                |
-| Selenium (3 testes)                  | passam                                              | passam, com o expediente aberto (ver "Achado fora do visual") |
+| Detector                             | Antes                                               | Depois                                               |
+| ------------------------------------ | --------------------------------------------------- | ---------------------------------------------------- |
+| impeccable (24 estados renderizados) | 20 problemas e 4 avisos                             | 0 e 0                                                |
+| botão secundário no hover            | texto índigo sobre índigo escuro, 1,6:1 (ilegível)  | fundo neutro, texto da marca a 7:1                   |
+| texto cinza na bolha do cliente      | 4,3:1                                               | 5,7:1                                                |
+| copy-lint                            | 3 (separador `·` nos metadados)                     | 0                                                    |
+| noise-scan                           | 2 (um "Abrir" repetido em cada conversa)            | 0                                                    |
+| cores                                | 17 cores cruas (16 distintas) da paleta do Tailwind | tokens HSL, tema claro e escuro                      |
+| corta-scan e ritmo-scan (390 e 1280) | não medido                                          | 0                                                    |
+| `npm test`, BDD, Postman             | 166, 24 cenários, 26 requisições e 82 asserções     | iguais, passam                                       |
+| Selenium (3 testes)                  | passam                                              | passam a qualquer hora (ver "Achado fora do visual") |
 
 ## Slop corrigido
 
@@ -79,13 +79,13 @@ Método: skill `visant-killer` (github.com/pedrojaques99/visant-skills-public) c
 - **F5 Escondido ou compactado:** os botões "Abrir" e as caixas da fila.
 - **F6 Nível Vale do Silício:** atalho de teclado para assumir o próximo da fila, tempo de espera em destaque quando passa de um limite e prévia da última mensagem na fila. Nenhum dos três existe hoje.
 
-## Achado fora do visual
+## Achado fora do visual (corrigido)
 
-O teste de ponta a ponta "cliente pede atendente…" falha fora do expediente (segunda a sexta, das 08h às 18h). Fora desse horário, o bot responde com a mensagem de fora do expediente, e não "Você está na fila".
+O teste de ponta a ponta "cliente pede atendente…" falhava fora do expediente (segunda a sexta, das 08h às 18h): o bot respondia com a mensagem de fora do expediente, e não "Você está na fila". O CI só passava porque rodava em horário comercial.
 
-- **Por que o CI passa:** ele roda em horário comercial.
-- **Como rodei aqui:** com `ATENDIMENTO_DIAS=0-6` e `ATENDIMENTO_HORARIO=00:00-24:00`.
-- **Correção sugerida:** o modo `--teste` abrir o expediente, ou o teste injetar o relógio.
+- **Causa:** o repositório já tinha `config/teste.env` com o atendimento sempre aberto, mas o script `start:teste` nunca carregava esse arquivo.
+- **Correção:** `start:teste` passou a ser `node --env-file=config/teste.env src/server.ts`.
+- **Verificação:** às 23:28, sem variável nenhuma, o Postman (26 requisições) e o Selenium (3 testes) passam.
 
 ## Não verificado
 
