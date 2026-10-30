@@ -15,6 +15,9 @@ services:
 
   mongo:
     image: mongo:8
+    # Kernel 6.19+: o MongoDB 8 só sobe com o rseq da glibc ligado (SERVER-121912).
+    environment:
+      GLIBC_TUNABLES: glibc.pthread.rseq=1
     volumes: ['dados:/data/db']
     healthcheck:
       test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
