@@ -1,22 +1,57 @@
+/* Paleta por token HSL (canais soltos: use hsl(var(--x))). Claro por padrão, escuro pelo sistema.
+   A cor da marca (azul-petróleo) marca só a ação principal, o link e a bolha do cliente. */
 :root {
-  --fundo: #f4f6fb;
-  --painel: #ffffff;
-  --texto: #1d2433;
-  --suave: #5f6b85;
-  --borda: #e1e6f0;
-  --primaria: #4f46e5;
-  --primaria-escura: #3730a3;
-  --cliente: #e0e7ff;
-  --atendente: #dcfce7;
-  --erro: #b42318;
+  --fundo: 210 20% 97%;
+  --painel: 0 0% 100%;
+  --painel-2: 210 20% 95%;
+  --texto: 215 25% 15%;
+  --suave: 215 14% 38%;
+  --borda: 214 20% 87%;
+  --marca: 194 85% 26%;
+  --marca-forte: 194 85% 20%;
+  --marca-texto: 194 85% 26%;
+  --sobre-marca: 0 0% 100%;
+  --cliente: 194 60% 93%;
+  --atendente: 150 38% 92%;
+  --espera: 40 95% 90%;
+  --espera-texto: 30 85% 26%;
+  --ok: 150 38% 92%;
+  --ok-texto: 152 60% 22%;
+  --erro: 2 70% 42%;
+  --erro-suave: 2 80% 96%;
+  --dur: 150ms;
+  color-scheme: light;
   font-family:
     system-ui,
     -apple-system,
     'Segoe UI',
     Roboto,
     sans-serif;
-  color: var(--texto);
-  background: var(--fundo);
+  color: hsl(var(--texto));
+  background: hsl(var(--fundo));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fundo: 215 25% 8%;
+    --painel: 215 22% 12%;
+    --painel-2: 215 20% 16%;
+    --texto: 210 20% 92%;
+    --suave: 214 12% 68%;
+    --borda: 215 15% 23%;
+    --marca: 194 85% 30%;
+    --marca-forte: 194 85% 25%;
+    --marca-texto: 190 70% 66%;
+    --cliente: 194 45% 20%;
+    --atendente: 152 30% 18%;
+    --espera: 38 45% 18%;
+    --espera-texto: 42 90% 70%;
+    --ok: 152 30% 18%;
+    --ok-texto: 150 55% 70%;
+    --erro: 4 85% 72%;
+    --erro-suave: 2 40% 17%;
+    color-scheme: dark;
+  }
 }
 
 * {
@@ -38,16 +73,21 @@ body {
 
 button {
   font: inherit;
-  border: 0;
+  font-weight: 600;
+  border: 1px solid transparent;
   border-radius: 8px;
-  padding: 0.6rem 1rem;
-  background: var(--primaria);
-  color: #fff;
+  min-height: 2.5rem;
+  padding: 0.5rem 1rem;
+  background: hsl(var(--marca));
+  color: hsl(var(--sobre-marca));
   cursor: pointer;
+  transition:
+    background-color var(--dur) ease-out,
+    border-color var(--dur) ease-out;
 }
 
 button:hover:not(:disabled) {
-  background: var(--primaria-escura);
+  background: hsl(var(--marca-forte));
 }
 
 button:disabled {
@@ -55,23 +95,52 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* secundário: fundo do painel; o hover muda o fundo, nunca a cor do texto para algo ilegível */
 button.secundario {
-  background: transparent;
-  color: var(--primaria);
-  border: 1px solid var(--borda);
+  background: hsl(var(--painel));
+  color: hsl(var(--marca-texto));
+  border-color: hsl(var(--borda));
+}
+
+button.secundario:hover:not(:disabled) {
+  background: hsl(var(--painel-2));
+}
+
+button.perigo {
+  background: hsl(var(--painel));
+  color: hsl(var(--erro));
+  border-color: hsl(var(--borda));
+}
+
+button.perigo:hover:not(:disabled) {
+  background: hsl(var(--erro-suave));
 }
 
 input {
   font: inherit;
-  padding: 0.6rem 0.8rem;
-  border: 1px solid var(--borda);
+  min-height: 2.5rem;
+  padding: 0.5rem 0.8rem;
+  color: hsl(var(--texto));
+  background: hsl(var(--painel));
+  border: 1px solid hsl(var(--borda));
   border-radius: 8px;
   min-width: 0;
+  transition: border-color var(--dur) ease-out;
 }
 
-input:focus,
+input::placeholder {
+  color: hsl(var(--suave));
+  opacity: 1;
+}
+
+input:focus {
+  outline: none;
+  border-color: hsl(var(--marca-texto));
+  box-shadow: 0 0 0 3px hsl(var(--marca-texto) / 0.2);
+}
+
 button:focus-visible {
-  outline: 2px solid var(--primaria);
+  outline: 2px solid hsl(var(--marca-texto));
   outline-offset: 2px;
 }
 
@@ -80,9 +149,10 @@ button:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.9rem 1.2rem;
-  background: var(--painel);
-  border-bottom: 1px solid var(--borda);
+  padding: 0.75rem 1.25rem;
+  min-height: 3.75rem;
+  background: hsl(var(--painel));
+  border-bottom: 1px solid hsl(var(--borda));
 }
 
 .cabecalho div {
@@ -91,30 +161,33 @@ button:focus-visible {
 }
 
 .cabecalho small {
-  color: var(--suave);
+  color: hsl(var(--suave));
+  font-variant-numeric: tabular-nums;
 }
 
 .situacao {
-  font-size: 0.85rem;
-  padding: 0.25rem 0.7rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
   border-radius: 999px;
-  background: var(--cliente);
-  color: var(--primaria-escura);
+  background: hsl(var(--cliente));
+  color: hsl(var(--marca-texto));
+  white-space: nowrap;
 }
 
 .situacao.aguardando {
-  background: #fef3c7;
-  color: #92400e;
+  background: hsl(var(--espera));
+  color: hsl(var(--espera-texto));
 }
 
 .situacao.em_atendimento {
-  background: var(--atendente);
-  color: #166534;
+  background: hsl(var(--ok));
+  color: hsl(var(--ok-texto));
 }
 
 .situacao.encerrada {
-  background: var(--borda);
-  color: var(--suave);
+  background: hsl(var(--painel-2));
+  color: hsl(var(--suave));
 }
 
 .mensagens {
@@ -123,44 +196,48 @@ button:focus-visible {
   padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.5rem;
   overflow-y: auto;
 }
 
 .mensagem {
   max-width: min(80%, 34rem);
-  padding: 0.6rem 0.9rem;
-  border-radius: 12px;
-  background: var(--painel);
-  border: 1px solid var(--borda);
+  padding: 0.5rem 0.875rem;
+  border-radius: 14px;
+  border-top-left-radius: 4px;
+  background: hsl(var(--painel));
+  border: 1px solid hsl(var(--borda));
 }
 
 .mensagem p {
   margin: 0;
   white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 
 .mensagem.cliente {
   align-self: flex-end;
-  background: var(--cliente);
+  background: hsl(var(--cliente));
   border-color: transparent;
+  border-top-left-radius: 14px;
+  border-top-right-radius: 4px;
 }
 
 .mensagem.atendente {
-  background: var(--atendente);
+  background: hsl(var(--atendente));
   border-color: transparent;
 }
 
 .autor {
   display: block;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  color: var(--suave);
-  margin-bottom: 0.2rem;
+  color: hsl(var(--suave));
+  margin-bottom: 0.125rem;
 }
 
 .vazio {
-  color: var(--suave);
+  color: hsl(var(--suave));
   text-align: center;
   padding: 1rem;
 }
@@ -168,9 +245,9 @@ button:focus-visible {
 .envio {
   display: flex;
   gap: 0.5rem;
-  padding: 0.8rem 1rem;
-  background: var(--painel);
-  border-top: 1px solid var(--borda);
+  padding: 0.75rem 1rem;
+  background: hsl(var(--painel));
+  border-top: 1px solid hsl(var(--borda));
 }
 
 .envio input {
@@ -179,9 +256,9 @@ button:focus-visible {
 
 .erro {
   margin: 0;
-  padding: 0.6rem 1rem;
-  color: var(--erro);
-  background: #fef3f2;
+  padding: 0.625rem 1rem;
+  color: hsl(var(--erro));
+  background: hsl(var(--erro-suave));
 }
 
 /* ---------- Webchat ---------- */
@@ -192,8 +269,8 @@ button:focus-visible {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  background: var(--fundo);
-  border-inline: 1px solid var(--borda);
+  background: hsl(var(--fundo));
+  border-inline: 1px solid hsl(var(--borda));
 }
 
 .pagina-chat .mensagens {
@@ -210,14 +287,14 @@ button:focus-visible {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--suave);
+  color: hsl(var(--suave));
 }
 
 .aviso {
-  margin: 1rem 1.2rem 0;
-  padding: 0.6rem 1rem;
+  margin: 1rem 1.25rem 0;
+  padding: 0.625rem 1rem;
   border-radius: 8px;
-  background: var(--cliente);
+  background: hsl(var(--cliente));
 }
 
 .colunas {
@@ -225,61 +302,111 @@ button:focus-visible {
   grid-template-columns: minmax(16rem, 22rem) 1fr;
   align-items: start;
   gap: 1rem;
-  padding: 1rem 1.2rem;
+  padding: 1rem 1.25rem;
 }
 
 .painel {
-  background: var(--painel);
-  border: 1px solid var(--borda);
+  background: hsl(var(--painel));
+  border: 1px solid hsl(var(--borda));
   border-radius: 12px;
   padding: 1rem;
 }
 
 .painel h2 {
   font-size: 1rem;
-  margin: 0 0 0.8rem;
+  margin: 0 0 0.5rem;
 }
 
+.painel h2 + .cartoes {
+  margin-top: 0;
+}
+
+/* filas: linhas de uma lista, não caixas dentro do painel */
 .cartoes {
   list-style: none;
   margin: 0 0 1.5rem;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
 }
 
 .cartao {
   display: grid;
-  gap: 0.3rem;
-  padding: 0.8rem;
-  border: 1px solid var(--borda);
-  border-radius: 10px;
+  grid-template-columns: 1fr auto;
+  column-gap: 0.75rem;
+  row-gap: 0.25rem;
+  align-items: center;
+  padding: 0.75rem 0.5rem;
+  border-top: 1px solid hsl(var(--borda));
+  border-radius: 8px;
+}
+
+.cartao > * {
+  grid-column: 1;
+}
+
+.cartao > button {
+  grid-column: 2;
+  grid-row: 1 / span 3;
 }
 
 .cartao.selecionado {
-  border-color: var(--primaria);
+  background: hsl(var(--cliente));
+  border-top-color: transparent;
+}
+
+li:has(> .cartao.selecionado) + li > .cartao {
+  border-top-color: transparent;
+}
+
+/* "Minhas conversas": a linha inteira é o botão que abre a conversa */
+.cartao.linha {
+  width: 100%;
+  min-height: 0;
+  grid-template-columns: 1fr;
+  border-width: 1px 0 0;
+  border-style: solid;
+  border-color: hsl(var(--borda));
+  background: transparent;
+  color: inherit;
+  font-weight: normal;
+  text-align: left;
+}
+
+.cartao.linha:hover:not(:disabled) {
+  background: hsl(var(--painel-2));
+}
+
+.cartao.linha.selecionado,
+.cartao.linha.selecionado:hover:not(:disabled) {
+  background: hsl(var(--cliente));
+  border-top-color: transparent;
 }
 
 .cartao small {
-  color: var(--suave);
+  color: hsl(var(--suave));
   font-weight: normal;
+  font-variant-numeric: tabular-nums;
 }
 
 .canal {
   justify-self: start;
-  font-size: 0.75rem;
-  padding: 0.1rem 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.0625rem 0.5rem;
   border-radius: 999px;
-  background: var(--borda);
+  background: hsl(var(--painel-2));
+  color: hsl(var(--suave));
 }
 
 .canal.whatsapp {
-  background: #dcfce7;
+  background: hsl(var(--ok));
+  color: hsl(var(--ok-texto));
 }
 
 .canal.telegram {
-  background: #e0f2fe;
+  background: hsl(var(--cliente));
+  color: hsl(var(--marca-texto));
 }
 
 .conversa {
@@ -289,6 +416,24 @@ button:focus-visible {
   min-height: 24rem;
 }
 
+.topo-conversa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.topo-conversa h2 {
+  margin: 0;
+}
+
+.topo-conversa small {
+  color: hsl(var(--suave));
+  font-variant-numeric: tabular-nums;
+}
+
 .conversa .mensagens {
   flex: 1;
   min-height: 0;
@@ -296,9 +441,15 @@ button:focus-visible {
 }
 
 .conversa .envio {
-  padding: 0.8rem 0 0;
+  padding: 0.75rem 0 0;
   border-top: 0;
-  flex-wrap: wrap;
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
 }
 
 @media (max-width: 720px) {

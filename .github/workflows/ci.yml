@@ -22,6 +22,9 @@ jobs:
       mongo:
         image: mongo:8
         ports: ['27017:27017']
+        # Runners com kernel 6.19+: o MongoDB 8 só sobe com o rseq da glibc ligado (SERVER-121912).
+        env:
+          GLIBC_TUNABLES: glibc.pthread.rseq=1
         options: >-
           --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
           --health-interval 5s --health-timeout 5s --health-retries 12
@@ -63,6 +66,9 @@ jobs:
       mongo:
         image: mongo:8
         ports: ['27017:27017']
+        # Runners com kernel 6.19+: o MongoDB 8 só sobe com o rseq da glibc ligado (SERVER-121912).
+        env:
+          GLIBC_TUNABLES: glibc.pthread.rseq=1
         options: >-
           --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
           --health-interval 5s --health-timeout 5s --health-retries 12

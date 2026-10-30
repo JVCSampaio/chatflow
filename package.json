@@ -20,7 +20,7 @@
     "test:bdd": "cucumber-js",
     "test:postman": "newman run postman/chatflow.postman_collection.json -e postman/local.postman_environment.json -r cli,htmlextra --reporter-htmlextra-export reports/newman.html",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "start:teste": "node src/server.ts --teste",
+    "start:teste": "node --env-file=config/teste.env src/server.ts",
     "e2e": "npm run build:web && start-server-and-test start:teste http-get://127.0.0.1:3000/health \"npm run test:postman && npm run test:e2e\"",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web",
     "lint": "prettier --check . && npm run typecheck",
