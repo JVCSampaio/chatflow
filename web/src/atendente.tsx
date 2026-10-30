@@ -135,9 +135,9 @@ function Console() {
                   {nomeDo(c)} <small>{protocolo(c.id)}</small>
                 </strong>
                 <small>
-                  {MOTIVOS[c.transferencia?.motivo ?? ''] ?? 'Transferida'} · desde{' '}
+                  {MOTIVOS[c.transferencia?.motivo ?? ''] ?? 'Transferida'}, desde{' '}
                   {hora(c.transferencia?.em ?? c.criadaEm)}
-                  {c.transferencia?.foraDoExpediente && ' · fora do expediente'}
+                  {c.transferencia?.foraDoExpediente && ', fora do expediente'}
                 </small>
                 <button disabled={!atendente} onClick={() => assumir(c.id)} aria-label={`Assumir ${protocolo(c.id)}`}>
                   Assumir
@@ -147,14 +147,20 @@ function Console() {
           </ul>
           <h2>Minhas conversas ({minhas.length})</h2>
           <ul className="cartoes">
+            {/* a linha inteira abre a conversa: um "Abrir" repetido em cada item era ruído */}
             {minhas.map((c) => (
-              <li key={c.id} className={`cartao ${c.id === aberta ? 'selecionado' : ''}`}>
-                <span className={`canal ${c.canal}`}>{CANAIS[c.canal]}</span>
-                <strong>
-                  {nomeDo(c)} <small>{protocolo(c.id)}</small>
-                </strong>
-                <button className="secundario" onClick={() => setAberta(c.id)} aria-label={`Abrir ${protocolo(c.id)}`}>
-                  Abrir
+              <li key={c.id}>
+                <button
+                  type="button"
+                  className={`cartao linha ${c.id === aberta ? 'selecionado' : ''}`}
+                  onClick={() => setAberta(c.id)}
+                  aria-current={c.id === aberta ? 'true' : undefined}
+                  aria-label={`Abrir ${protocolo(c.id)}`}
+                >
+                  <span className={`canal ${c.canal}`}>{CANAIS[c.canal]}</span>
+                  <strong>
+                    {nomeDo(c)} <small>{protocolo(c.id)}</small>
+                  </strong>
                 </button>
               </li>
             ))}
@@ -165,9 +171,20 @@ function Console() {
             <p className="vazio">{atendente ? 'Assuma uma conversa da fila.' : 'Informe seu nome para atender.'}</p>
           ) : (
             <>
-              <h2>
-                {nomeDo(detalhe.conversa)} · {CANAIS[detalhe.conversa.canal]} · {protocolo(detalhe.conversa.id)}
-              </h2>
+              {/* Encerrar fica no topo, longe do Enviar: é a ação rara e sem volta da tela */}
+              <div className="topo-conversa">
+                <div>
+                  <h2>{nomeDo(detalhe.conversa)}</h2>
+                  <small>
+                    {CANAIS[detalhe.conversa.canal]}, protocolo {protocolo(detalhe.conversa.id)}
+                  </small>
+                </div>
+                {detalhe.conversa.status === 'em_atendimento' && (
+                  <button type="button" className="perigo" onClick={encerrar}>
+                    Encerrar atendimento
+                  </button>
+                )}
+              </div>
               <ol className="mensagens" role="log" aria-label="Histórico da conversa">
                 {detalhe.mensagens.map((m) => (
                   <li key={m.id} className={`mensagem ${m.autor}`} data-autor={m.autor}>
@@ -193,9 +210,6 @@ function Console() {
                     placeholder="Escreva a resposta"
                   />
                   <button disabled={!resposta.trim()}>Enviar</button>
-                  <button type="button" className="secundario" onClick={encerrar}>
-                    Encerrar atendimento
-                  </button>
                 </form>
               )}
             </>
